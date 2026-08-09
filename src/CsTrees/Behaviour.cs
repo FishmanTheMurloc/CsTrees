@@ -115,9 +115,11 @@ public abstract class Behaviour
     /// Tick the behaviour without iterating step-by-step over children.
     /// Convenience method that runs <see cref="Tick"/> to completion.
     /// </summary>
-    public async Task TickOnce()
+    /// <returns>The final <see cref="Status"/> of this behaviour after ticking.</returns>
+    public async Task<Status> TickOnce()
     {
         await foreach (var _ in Tick()) { }
+        return Status;
     }
 
     /// <summary>
