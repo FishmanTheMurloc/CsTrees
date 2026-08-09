@@ -230,10 +230,19 @@ public sealed class Blackboard
 
     internal bool TryGet<T>(BehaviourKeyAccess<T> access, out T value)
     {
-        if (_storage.TryGetValue(access.Key, out var v) && v is T t)
+        if (_storage.TryGetValue(access.Key, out var v))
         {
-            value = t;
-            return true;
+            if (v is T t)
+            {
+                value = t;
+                return true;
+            }
+
+            if (v is null && Nullable.GetUnderlyingType(typeof(T)) != null)
+            {
+                value = default!;
+                return true;
+            }
         }
 
         value = default!;
