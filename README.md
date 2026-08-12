@@ -56,7 +56,7 @@ var tree = TreeBuilder.Create()
 ```csharp
 using CsTrees.Display;
 
-string ascii = Display.AsciiTree(tree, showStatus: true);
+string ascii = Display.AsciiTree(tree, showStatus: true, showFeedbackMessage: true);
 Console.WriteLine(ascii);
 ```
 

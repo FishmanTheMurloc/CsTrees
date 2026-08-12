@@ -28,8 +28,12 @@ public static class Display
     /// expanded; unvisited subtrees are collapsed to a placeholder.
     /// </param>
     /// <param name="showStatus">
-    /// If <c>true</c>, always show status and feedback message for every
-    /// behaviour, not just visited ones.
+    /// If <c>true</c>, always show status for every behaviour, not just
+    /// visited ones.
+    /// </param>
+    /// <param name="showFeedbackMessage">
+    /// If <c>true</c>, always show feedback message for every behaviour,
+    /// not just visited ones.
     /// </param>
     /// <param name="visited">
     /// Dictionary of behaviour id and status pairs for behaviours visited
@@ -46,6 +50,7 @@ public static class Display
         TreeRenderer renderer,
         bool showOnlyVisited = false,
         bool showStatus = false,
+        bool showFeedbackMessage = false,
         Dictionary<Guid, Status>? visited = null,
         Dictionary<Guid, Status>? previouslyVisited = null,
         int indent = 0)
@@ -57,6 +62,7 @@ public static class Display
         var tipId = tip?.Id ?? Guid.Empty;
 
         renderer.ShowStatus = showStatus;
+        renderer.ShowFeedbackMessage = showFeedbackMessage;
         renderer.Begin();
         RenderBehaviourRecursive(root, indent, showOnlyVisited, _visited, _previouslyVisited, tipId, renderer);
         renderer.End();
@@ -73,7 +79,8 @@ public static class Display
     /// </summary>
     /// <param name="root">The root of the tree, or subtree, to render.</param>
     /// <param name="showOnlyVisited">Show only visited behaviours and collapse unvisited subtrees.</param>
-    /// <param name="showStatus">Always show status and feedback message for every element.</param>
+    /// <param name="showStatus">Always show status for every element.</param>
+    /// <param name="showFeedbackMessage">Always show feedback message for every element.</param>
     /// <param name="visited">
     /// Dictionary of behaviour id and status pairs for behaviours visited
     /// on the current tick.
@@ -87,6 +94,7 @@ public static class Display
         Behaviour root,
         bool showOnlyVisited = false,
         bool showStatus = false,
+        bool showFeedbackMessage = false,
         Dictionary<Guid, Status>? visited = null,
         Dictionary<Guid, Status>? previouslyVisited = null,
         int indent = 0)
@@ -96,6 +104,7 @@ public static class Display
             new AsciiTreeRenderer(),
             showOnlyVisited,
             showStatus,
+            showFeedbackMessage,
             visited,
             previouslyVisited,
             indent);

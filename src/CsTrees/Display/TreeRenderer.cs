@@ -11,11 +11,17 @@ namespace CsTrees.Display;
 public abstract class TreeRenderer
 {
     /// <summary>
-    /// Whether to always show status and feedback message for every behaviour,
-    /// not just visited ones. Set by <see cref="Display.RenderTree"/> before
-    /// traversal begins.
+    /// Whether to always show status for every behaviour, not just visited
+    /// ones. Set by <see cref="Display.RenderTree"/> before traversal begins.
     /// </summary>
     public bool ShowStatus { get; set; }
+
+    /// <summary>
+    /// Whether to always show feedback message for every behaviour, not just
+    /// visited ones. Set by <see cref="Display.RenderTree"/> before traversal
+    /// begins.
+    /// </summary>
+    public bool ShowFeedbackMessage { get; set; }
 
     /// <summary>
     /// Called once before the tree traversal begins.

@@ -42,13 +42,13 @@ public sealed class AsciiTreeRenderer : TreeRenderer
     /// <summary>
     /// Render a single behaviour as a line of ASCII text.
     /// <para>
-    /// The line format depends on the behaviour's visit state:
+    /// Status and feedback message are rendered independently:
     /// <list type="bullet">
-    ///   <item>Visited or <see cref="TreeRenderer.ShowStatus"/>:
-    ///     <c>Indent TypeSymbol Name [StatusSymbol] -- FeedbackMessage</c></item>
-    ///   <item>Previously running but not currently visited:
-    ///     <c>Indent TypeSymbol Name [StatusSymbol]</c></item>
-    ///   <item>Not visited: <c>Indent TypeSymbol Name</c></item>
+    ///   <item>Status shown when visited, <see cref="TreeRenderer.ShowStatus"/> is <c>true</c>,
+    ///     or the behaviour was previously running: <c>[StatusSymbol]</c></item>
+    ///   <item>Feedback shown when visited or
+    ///     <see cref="TreeRenderer.ShowFeedbackMessage"/> is <c>true</c>: <c> -- message</c></item>
+    ///   <item>Neither shown: just <c>Name</c></item>
     /// </list>
     /// Tip behaviours are passed through <see cref="AsciiSymbols.FormatText"/>
     /// for potential highlighting.
@@ -72,32 +72,26 @@ public sealed class AsciiTreeRenderer : TreeRenderer
         _sb.Append(_symbols.FormatText(typeSymbol, tip));
         _sb.Append(' ');
 
-        // Name and status
-        if (ShowStatus || info.Visited)
+        // Name, status, and feedback message — each independently controlled
+        var name = info.Behaviour.Name.Replace("\n", " ");
+        var renderStatus = ShowStatus || info.Visited || info.PreviouslyRunning;
+        var renderFeedback = ShowFeedbackMessage || info.Visited;
+
+        _sb.Append(_symbols.FormatText(name, tip));
+
+        if (renderStatus)
         {
-            var name = info.Behaviour.Name.Replace("\n", " ");
-            _sb.Append(_symbols.FormatText($"{name} [", tip));
             var statusSymbol = _symbols.GetStatusSymbol(info.Behaviour.Status);
             var formattedStatus = _symbols.FormatStatus(statusSymbol, info.Behaviour.Status);
-            _sb.Append(_symbols.FormatText(formattedStatus, tip));
-            var feedback = string.IsNullOrEmpty(info.Behaviour.FeedbackMessage)
-                ? "]"
-                : $"] -- {info.Behaviour.FeedbackMessage}";
-            _sb.Append(_symbols.FormatText(feedback, tip));
-        }
-        else if (info.PreviouslyRunning)
-        {
-            var name = info.Behaviour.Name.Replace("\n", " ");
-            _sb.Append(_symbols.FormatText($"{name} [", tip));
-            var statusSymbol = _symbols.GetStatusSymbol(info.Behaviour.Status);
-            var formattedStatus = _symbols.FormatStatus(statusSymbol, info.Behaviour.Status);
+            _sb.Append(_symbols.FormatText($" [", tip));
             _sb.Append(_symbols.FormatText(formattedStatus, tip));
             _sb.Append(_symbols.FormatText("]", tip));
         }
-        else
+
+        if (renderFeedback && !string.IsNullOrEmpty(info.Behaviour.FeedbackMessage))
         {
-            var name = info.Behaviour.Name.Replace("\n", " ");
-            _sb.Append(_symbols.FormatText(name, tip));
+            _sb.Append(_symbols.FormatText(" -- ", tip));
+            _sb.Append(_symbols.FormatText(info.Behaviour.FeedbackMessage, tip));
         }
 
         _sb.AppendLine();

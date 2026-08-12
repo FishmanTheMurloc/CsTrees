@@ -26,7 +26,7 @@ public sealed class AsciiTreeRendererTests
         await sequence.Tick().ToListAsync();
 
         // Act
-        var result = CsTrees.Display.Display.AsciiTree(sequence, showStatus: true);
+        var result = CsTrees.Display.Display.AsciiTree(sequence, showStatus: true, showFeedbackMessage: true);
 
         // Assert
         var expected = string.Join(Environment.NewLine,
