@@ -22,7 +22,7 @@ using Blackboard = CsTrees.Blackboard.Blackboard;
 /// </code>
 /// </para>
 /// </remarks>
-public sealed class TreeBuilder
+public class TreeBuilder
 {
     /// <summary>
     /// Base class for frames on the builder stack.
@@ -56,7 +56,10 @@ public sealed class TreeBuilder
     private readonly Stack<Frame> _frameStack = new();
     private NodeBuilder? _root;
 
-    private TreeBuilder() { }
+    /// <summary>
+    /// Protected constructor to allow subclassing for domain-specific builders.
+    /// </summary>
+    protected TreeBuilder() { }
 
     /// <summary>
     /// Create a new TreeBuilder instance.
