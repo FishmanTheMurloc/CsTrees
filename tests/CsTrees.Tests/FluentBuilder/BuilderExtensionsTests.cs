@@ -16,7 +16,7 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act - 使用 SG 生成的扩展方法
-        var tree = TreeBuilder.Create()
+        var tree = new TreeBuilder()
             .WithBlackboard(bb)
                 .Sequence("Main")
                     .PortTestSimpleOutput("Output1")
@@ -39,7 +39,7 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act
-        var tree = TreeBuilder.Create()
+        var tree = new TreeBuilder()
             .Sequence("Root")
                 .WithBlackboard(bb)
                     .PortTestSimpleOutput("Output", labelKey: "my_custom_key")
@@ -60,7 +60,7 @@ public class BuilderExtensionsTests
     {
         // Act & Assert
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            TreeBuilder.Create()
+            new TreeBuilder()
                 .Sequence("Main")
                     .PortTestSimpleOutput("Output")
                 .End()
@@ -77,7 +77,7 @@ public class BuilderExtensionsTests
         var bb2 = new CsTrees.Blackboard.Blackboard();
 
         // Act
-        var tree = TreeBuilder.Create()
+        var tree = new TreeBuilder()
             .Sequence("Root")
                 .WithBlackboard(bb1)
                     .PortTestSimpleOutput("Output1")
@@ -107,7 +107,7 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act — 不传可选参数 tag，依赖默认值 null
-        var tree = TreeBuilder.Create()
+        var tree = new TreeBuilder()
             .Sequence("Root")
                 .WithBlackboard(bb)
                     .PortTestOptionalParam("Node", 5)
@@ -130,7 +130,7 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act — 显式传入可选参数 tag 和 port key
-        var tree = TreeBuilder.Create()
+        var tree = new TreeBuilder()
             .Sequence("Root")
                 .WithBlackboard(bb)
                     .PortTestOptionalParam("Node", 3, tag: "myTag", resultKey: "custom_result")

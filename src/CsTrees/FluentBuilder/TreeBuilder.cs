@@ -11,7 +11,7 @@ using Blackboard = CsTrees.Blackboard.Blackboard;
 /// <para>
 /// Example usage:
 /// <code>
-/// var tree = TreeBuilder.Create()
+/// var tree = new TreeBuilder()
 ///     .Sequence("Main")
 ///         .WithBlackboard(bb1)
 ///             .Leaf(() => new Success("Action1"))
@@ -22,7 +22,9 @@ using Blackboard = CsTrees.Blackboard.Blackboard;
 /// </code>
 /// </para>
 /// </remarks>
-public class TreeBuilder
+/// <typeparam name="TBuilder">The derived builder type for fluent chaining.</typeparam>
+public class TreeBuilder<TBuilder>
+    where TBuilder : TreeBuilder<TBuilder>
 {
     /// <summary>
     /// Base class for frames on the builder stack.
@@ -62,11 +64,6 @@ public class TreeBuilder
     protected TreeBuilder() { }
 
     /// <summary>
-    /// Create a new TreeBuilder instance.
-    /// </summary>
-    public static TreeBuilder Create() => new();
-
-    /// <summary>
     /// Get the current blackboard from the nearest blackboard frame in the stack.
     /// </summary>
     private Blackboard? GetCurrentBlackboard()
@@ -95,11 +92,16 @@ public class TreeBuilder
     }
 
     /// <summary>
+    /// Cast <c>this</c> to the derived builder type for fluent chaining.
+    /// </summary>
+    protected TBuilder Self => (TBuilder)this;
+
+    /// <summary>
     /// Push a composite node onto the builder stack.
     /// </summary>
     /// <param name="factory">Factory function that creates the composite from its children.</param>
     /// <returns>This builder for method chaining.</returns>
-    public TreeBuilder PushComposite(Func<IEnumerable<Behaviour>, Composite> factory)
+    public TBuilder PushComposite(Func<IEnumerable<Behaviour>, Composite> factory)
     {
         var builder = new CompositeBuilder(factory);
 
@@ -110,7 +112,7 @@ public class TreeBuilder
             decoratorParent.SetChild(builder);
 
         _frameStack.Push(new CompositeFrame { Builder = builder });
-        return this;
+        return Self;
     }
 
     /// <summary>
@@ -119,7 +121,7 @@ public class TreeBuilder
     /// </summary>
     /// <param name="factory">Factory function that creates the decorator from its child.</param>
     /// <returns>This builder for method chaining.</returns>
-    public TreeBuilder PushDecorator(Func<Behaviour, Decorator> factory)
+    public TBuilder PushDecorator(Func<Behaviour, Decorator> factory)
     {
         var builder = new DecoratorBuilder(factory);
 
@@ -130,7 +132,7 @@ public class TreeBuilder
             decoratorParent.SetChild(builder);
 
         _frameStack.Push(new DecoratorFrame { Builder = builder });
-        return this;
+        return Self;
     }
 
     /// <summary>
@@ -139,13 +141,13 @@ public class TreeBuilder
     /// </summary>
     /// <param name="blackboard">The blackboard to use for this scope.</param>
     /// <returns>This builder for method chaining.</returns>
-    public TreeBuilder WithBlackboard(Blackboard blackboard)
+    public TBuilder WithBlackboard(Blackboard blackboard)
     {
         if (blackboard is null)
             throw new ArgumentNullException(nameof(blackboard));
 
         _frameStack.Push(new BlackboardFrame { Blackboard = blackboard });
-        return this;
+        return Self;
     }
 
     /// <summary>
@@ -153,7 +155,7 @@ public class TreeBuilder
     /// </summary>
     /// <param name="factory">Factory function that creates the behaviour.</param>
     /// <returns>This builder for method chaining.</returns>
-    public TreeBuilder Leaf(Func<Behaviour> factory)
+    public TBuilder Leaf(Func<Behaviour> factory)
     {
         var builder = new LeafBuilder(factory);
 
@@ -168,7 +170,7 @@ public class TreeBuilder
         else
             throw new InvalidOperationException($"Cannot add leaf child to {parent.GetType().Name}");
 
-        return this;
+        return Self;
     }
 
     /// <summary>
@@ -177,7 +179,7 @@ public class TreeBuilder
     /// </summary>
     /// <param name="factory">Factory function that creates the behaviour, receiving the current blackboard.</param>
     /// <returns>This builder for method chaining.</returns>
-    public TreeBuilder LeafWithBlackboard(Func<Blackboard?, Behaviour> factory)
+    public TBuilder LeafWithBlackboard(Func<Blackboard?, Behaviour> factory)
     {
         var currentBB = GetCurrentBlackboard();
         var builder = new LeafBuilder(() => factory(currentBB));
@@ -193,14 +195,14 @@ public class TreeBuilder
         else
             throw new InvalidOperationException($"Cannot add leaf child to {parent.GetType().Name}");
 
-        return this;
+        return Self;
     }
 
     /// <summary>
     /// End the current scope (composite, decorator, or blackboard) and pop it from the stack.
     /// </summary>
     /// <returns>This builder for method chaining.</returns>
-    public TreeBuilder End()
+    public TBuilder End()
     {
         if (_frameStack.Count == 0)
             throw new InvalidOperationException("No scope to end.");
@@ -209,14 +211,14 @@ public class TreeBuilder
 
         // If we just popped a blackboard frame, we're done
         if (completed is BlackboardFrame)
-            return this;
+            return Self;
 
         // If we popped a composite or decorator, check if this is the root
         if (completed is CompositeFrame or DecoratorFrame)
         {
             // Check if there are any more node frames (composite/decorator) in the stack
             bool hasMoreNodeFrames = _frameStack.Any(f => f is CompositeFrame or DecoratorFrame);
-            
+
             if (!hasMoreNodeFrames)
             {
                 // No more node frames, this is the root
@@ -229,7 +231,7 @@ public class TreeBuilder
             }
         }
 
-        return this;
+        return Self;
     }
 
     /// <summary>
@@ -329,4 +331,11 @@ public class TreeBuilder
 
         return tree;
     }
+}
+
+/// <summary>
+/// Non-generic alias of <see cref="TreeBuilder{TBuilder}"/> for direct use.
+/// </summary>
+public class TreeBuilder : TreeBuilder<TreeBuilder>
+{
 }

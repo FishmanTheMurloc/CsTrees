@@ -1,5 +1,6 @@
 using CsTrees;
 using CsTrees.Blackboard;
+using CsTrees.FluentBuilder;
 
 namespace CsTrees.Tests.Blackboard;
 
@@ -17,7 +18,7 @@ public partial class PortTestDetectButton : Behaviour
     [System.ComponentModel.Description("将写入检测到的Y坐标到BB上")]
     public BehaviourKeyAccess<int> Y { get; private set; } = null!;
 
-    public PortTestDetectButton(string name) : base(name) { }
+    private PortTestDetectButton(string name) : base(name) { }
 
     protected async override Task<Status> Update()
     {
@@ -58,12 +59,13 @@ public partial class PortTestMoveTo : Behaviour
 /// <summary>
 /// 不指定 Key 时使用属性名作为默认键名。
 /// </summary>
+[GenerateTreeBuilderExtension]
 public partial class PortTestSimpleOutput : Behaviour
 {
     [BlackboardKey(Access = Access.Write)]
     public BehaviourKeyAccess<string> Label { get; private set; } = null!;
 
-    public PortTestSimpleOutput(string name) : base(name) { }
+    private PortTestSimpleOutput(string name) : base(name) { }
 
     protected async override Task<Status> Update()
     {
@@ -82,12 +84,12 @@ public partial class PortTestExtended : Behaviour
 
     private readonly int _id;
 
-    public PortTestExtended(string name) : base(name)
+    private PortTestExtended(string name) : base(name)
     {
         _id = 0;
     }
 
-    public PortTestExtended(string name, int id) : base(name)
+    private PortTestExtended(string name, int id) : base(name)
     {
         _id = id;
     }
@@ -103,6 +105,7 @@ public partial class PortTestExtended : Behaviour
 /// 带可选参数构造函数的测试行为，用于验证 SG 正确处理默认值参数
 /// （可选参数必须位于必选参数之后，Blackboard 必选参数需插入到可选参数之前）。
 /// </summary>
+[GenerateTreeBuilderExtension]
 public partial class PortTestOptionalParam : Behaviour
 {
     [BlackboardKey("result", Access = Access.Write)]
@@ -111,7 +114,7 @@ public partial class PortTestOptionalParam : Behaviour
     private readonly int _multiplier;
     private readonly string? _tag;
 
-    public PortTestOptionalParam(string name, int multiplier, string? tag = null) : base(name)
+    private PortTestOptionalParam(string name, int multiplier, string? tag = null) : base(name)
     {
         _multiplier = multiplier;
         _tag = tag;
