@@ -5,7 +5,7 @@ using System.Text;
 namespace CsTrees.SourceGenerator.Emitters;
 
 /// <summary>
-/// 产物③：为实现 IBehaviourCatalog&lt;TCatalog&gt; 的 partial TreeBuilder 子类生成预设构建方法。
+/// 为实现 IBehaviourCatalog&lt;TCatalog&gt; 的 partial TreeBuilder 子类生成预设构建方法。
 /// TCatalog 中每个 public 工厂方法（返回 Behaviour 子类）对应一个 public 实例方法，
 /// 方法体通过 Catalog 属性调用工厂并挂到树：
 /// 含 blackboard 参数的用 LeafWithBlackboard（作用域 blackboard 注入工厂），

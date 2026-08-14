@@ -10,7 +10,7 @@ namespace CsTrees.SourceGenerator.Analysis;
 
 /// <summary>
 /// 扫描实现 IBehaviourCatalog&lt;TCatalog&gt; 的 partial TreeBuilder 子类，
-/// 从 TCatalog 收集 public 工厂方法（返回 Behaviour 子类），作为产物③的声明来源。
+/// 从 TCatalog 收集 public 工厂方法（返回 Behaviour 子类），作为声明来源。
 /// </summary>
 internal static class TreeBuilderSubclassCollector
 {
