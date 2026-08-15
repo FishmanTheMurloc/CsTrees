@@ -98,8 +98,11 @@ internal static class BehaviourSymbolCollector
         if (isBlackboardKeyAccessType)
         {
             var valueTypeArg = namedType!.TypeArguments[0];
-            valueType = valueTypeArg.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            valueTypeRef = $"typeof({valueType})";
+            var format = SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
+                SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+            valueType = valueTypeArg.ToDisplayString(format);
+            var valueTypeNoNullable = valueTypeArg.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            valueTypeRef = $"typeof({valueTypeNoNullable})";
         }
         else
         {
