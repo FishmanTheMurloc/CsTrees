@@ -20,10 +20,10 @@ public class Condition : Decorator
     /// </summary>
     /// <param name="name">Name of the decorator.</param>
     /// <param name="child">The child behaviour to decorate.</param>
-    /// <param name="succeedStatus">The status the child must reach for this decorator to succeed.</param>
-    public Condition(string name, Behaviour child, Status succeedStatus) : base(name, child)
+    /// <param name="status">The status the child must reach for this decorator to succeed.</param>
+    public Condition(string name, Behaviour child, Status status) : base(name, child)
     {
-        SucceedStatus = succeedStatus;
+        SucceedStatus = status;
     }
 
     /// <summary>

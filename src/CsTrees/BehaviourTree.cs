@@ -203,7 +203,7 @@ public class BehaviourTree
     /// <param name="stopOnTerminalState">If true, stops when the tree's status is Success or Failure.</param>
     /// <param name="preTickHandler">Function to execute before ticking.</param>
     /// <param name="postTickHandler">Function to execute after ticking.</param>
-    public void TickTock(
+    public async Task TickTock(
         int periodMs,
         int numberOfIterations = int.MinValue,
         bool stopOnTerminalState = false,
@@ -217,7 +217,7 @@ public class BehaviourTree
             && (tickTocks < numberOfIterations || numberOfIterations == int.MinValue))
         {
             var startTime = DateTime.UtcNow;
-            Tick(preTickHandler, postTickHandler);
+            await Tick(preTickHandler, postTickHandler);
             var elapsed = (DateTime.UtcNow - startTime).TotalSeconds;
             var sleepTime = Math.Max(0.0, periodS - elapsed);
             System.Threading.Thread.Sleep((int)(sleepTime * 1000));

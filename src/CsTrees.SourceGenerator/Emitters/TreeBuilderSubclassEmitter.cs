@@ -5,11 +5,11 @@ using System.Text;
 namespace CsTrees.SourceGenerator.Emitters;
 
 /// <summary>
-/// 为实现 IBehaviourCatalog&lt;TCatalog&gt; 的 partial TreeBuilder 子类生成预设构建方法。
-/// TCatalog 中每个 public 工厂方法（返回 Behaviour 子类）对应一个 public 实例方法，
-/// 方法体通过 Catalog 属性调用工厂并挂到树：
-/// 含 blackboard 参数的用 LeafWithBlackboard（作用域 blackboard 注入工厂），
-/// 不含的用 Leaf。
+/// 为包含 IBehaviourCatalog 实例的 partial TreeBuilder 子类生成预设构建方法。
+/// Catalog 中每个 public 工厂方法（返回 Behaviour 子类）对应一个 public 实例方法：
+/// - Composite 返回 → PushComposite(children => catalog.Method(..., children, ...))
+/// - Decorator 返回 → PushDecorator(child => catalog.Method(..., child, ...))
+/// - 其他 Behaviour → Leaf/LeafWithBlackboard（根据是否有 blackboard 参数）
 /// </summary>
 internal static class TreeBuilderSubclassEmitter
 {
@@ -54,8 +54,8 @@ internal static class TreeBuilderSubclassEmitter
         sb.AppendLine($"        /// Add a {method.MethodName} node (generated, delegates to the private preset).");
         sb.AppendLine("        /// </summary>");
 
-        // 生成方法签名：跳过 blackboard 参数，保留其余（含默认值）
-        var sigParams = method.Parameters.Where(p => !p.IsBlackboard).ToList();
+        // 生成方法签名：跳过 blackboard、children、child 参数，保留其余（含默认值）
+        var sigParams = method.Parameters.Where(p => !p.IsBlackboard && !p.IsChildren && !p.IsChild).ToList();
 
         sb.Append($"        public {className} {method.MethodName}(");
         if (sigParams.Count == 0)
@@ -81,35 +81,105 @@ internal static class TreeBuilderSubclassEmitter
 
         sb.AppendLine("        {");
 
-        bool hasBlackboard = method.Parameters.Any(p => p.IsBlackboard);
-        if (hasBlackboard)
+        switch (method.NodeType)
         {
-            sb.AppendLine("            return LeafWithBlackboard(bb => {");
-            sb.AppendLine("                if (bb is null)");
-            sb.AppendLine($"                    throw new System.InvalidOperationException(\"Blackboard is required for {method.MethodName}. Use .WithBlackboard() to set the scope.\");");
-            sb.AppendLine();
-            sb.Append($"                return Catalog.{method.MethodName}(");
-            AppendCallArgs(sb, method);
-            sb.AppendLine(");");
-            sb.AppendLine("            });");
-        }
-        else
-        {
-            // 无 blackboard 参数：工厂方法不依赖作用域 blackboard，直接用 Leaf 挂到树
-            sb.AppendLine("            return Leaf(() => {");
-            sb.Append($"                return Catalog.{method.MethodName}(");
-            AppendCallArgs(sb, method);
-            sb.AppendLine(");");
-            sb.AppendLine("            });");
+            case NodeType.Composite:
+                GenerateCompositeBody(sb, method);
+                break;
+            case NodeType.Decorator:
+                GenerateDecoratorBody(sb, method);
+                break;
+            case NodeType.Leaf:
+            default:
+                GenerateLeafBody(sb, method);
+                break;
         }
 
         sb.AppendLine("        }");
     }
 
+    static void GenerateCompositeBody(StringBuilder sb, DeclMethodInfo method)
+    {
+        var scopeBB = GetScopeBlackboard(method);
+        sb.Append($"            return PushComposite({scopeBB}children => {method.CatalogMember}.{method.MethodName}(");
+        AppendCallArgs(sb, method);
+        sb.AppendLine("));");
+    }
+
+    static void GenerateDecoratorBody(StringBuilder sb, DeclMethodInfo method)
+    {
+        var scopeBB = GetScopeBlackboard(method);
+        sb.Append($"            return PushDecorator({scopeBB}child => {method.CatalogMember}.{method.MethodName}(");
+        AppendCallArgs(sb, method);
+        sb.AppendLine("));");
+    }
+
+    static void GenerateLeafBody(StringBuilder sb, DeclMethodInfo method)
+    {
+        var bbParam = GetBlackboardParam(method);
+        if (bbParam is not null)
+        {
+            sb.AppendLine("            return LeafWithBlackboard(bb => {");
+            sb.AppendLine("                if (bb is null)");
+            sb.AppendLine($"                    throw new System.InvalidOperationException(\"Blackboard is required for {method.MethodName}. Use .WithBlackboard() to set the scope.\");");
+            sb.AppendLine();
+            sb.Append($"                return {method.CatalogMember}.{method.MethodName}(");
+            AppendLeafCallArgs(sb, method);
+            sb.AppendLine(");");
+            sb.AppendLine("            });");
+        }
+        else
+        {
+            sb.Append($"            return Leaf(() => {method.CatalogMember}.{method.MethodName}(");
+            AppendLeafCallArgs(sb, method);
+            sb.AppendLine("));");
+        }
+    }
+
     /// <summary>
-    /// 按声明方法的参数顺序生成调用参数：blackboard 位置传 bb，其余传同名生成方法参数。
+    /// 如果 Composite/Decorator 方法有 blackboard 参数，返回 "bb, " 前缀，否则返回空字符串。
+    /// </summary>
+    static string GetScopeBlackboard(DeclMethodInfo method)
+    {
+        if (method.Parameters.Any(p => p.IsBlackboard))
+            return "bb, ";
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// 如果 Leaf 方法有 blackboard 参数，返回参数名 "bb"，否则返回 null。
+    /// </summary>
+    static string? GetBlackboardParam(DeclMethodInfo method)
+    {
+        var bbParam = method.Parameters.FirstOrDefault(p => p.IsBlackboard);
+        return bbParam is not null ? "bb" : null;
+    }
+
+    /// <summary>
+    /// 按声明方法的参数顺序生成调用参数：
+    /// blackboard 位置传 bb，children 位置传 children，child 位置传 child，其余传同名参数。
     /// </summary>
     private static void AppendCallArgs(StringBuilder sb, DeclMethodInfo method)
+    {
+        for (int i = 0; i < method.Parameters.Count; i++)
+        {
+            if (i > 0)
+                sb.Append(", ");
+            if (method.Parameters[i].IsBlackboard)
+                sb.Append("bb");
+            else if (method.Parameters[i].IsChildren)
+                sb.Append("children");
+            else if (method.Parameters[i].IsChild)
+                sb.Append("child");
+            else
+                sb.Append(method.Parameters[i].Name);
+        }
+    }
+
+    /// <summary>
+    /// Leaf 调用参数：blackboard 位置传 bb，其余传同名参数。
+    /// </summary>
+    private static void AppendLeafCallArgs(StringBuilder sb, DeclMethodInfo method)
     {
         for (int i = 0; i < method.Parameters.Count; i++)
         {

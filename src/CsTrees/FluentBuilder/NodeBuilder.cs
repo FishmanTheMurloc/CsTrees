@@ -1,3 +1,5 @@
+using System.Reflection.Emit;
+
 namespace CsTrees.FluentBuilder;
 
 /// <summary>
@@ -60,7 +62,7 @@ public sealed class CompositeBuilder : NodeBuilder
     internal bool HasChildren => _children.Count > 0;
 
     /// <summary>
-    /// Remove the last added child. Used by <see cref="TreeBuilder.Preview"/>
+    /// Remove the last added child. Used by <see cref="TreeBuilder&lt;TBuilder&gt;.Preview"/>
     /// to undo temporary placeholder insertion.
     /// </summary>
     internal void RemoveLastChild() => _children.RemoveAt(_children.Count - 1);
@@ -102,7 +104,7 @@ public sealed class DecoratorBuilder : NodeBuilder
     internal bool HasChild => _child is not null;
 
     /// <summary>
-    /// Clear the child reference. Used by <see cref="TreeBuilder.Preview"/>
+    /// Clear the child reference. Used by <see cref="TreeBuilder&lt;TBuilder&gt;.Preview"/>
     /// to undo temporary placeholder insertion.
     /// </summary>
     internal void ClearChild() => _child = null;

@@ -19,11 +19,22 @@ internal sealed class TreeBuilderSubclassInfo
 /// Parameters 保留所有参数（含 blackboard，用 IsBlackboard 标记），
 /// 以便生成签名时跳过 blackboard、生成调用时按原位置传 bb。
 /// </summary>
+internal enum NodeType
+{
+    Leaf,
+    Composite,
+    Decorator
+}
+
 internal sealed class DeclMethodInfo
 {
     public string MethodName { get; set; } = string.Empty;
+    public string CatalogMember { get; set; } = string.Empty;
     public List<ParamInfo> Parameters { get; set; } = new();
+    public NodeType NodeType { get; set; } = NodeType.Leaf;
     public bool HasBlackboard => Parameters.Exists(p => p.IsBlackboard);
+    public bool HasChildren => Parameters.Exists(p => p.IsChildren);
+    public bool HasChild => Parameters.Exists(p => p.IsChild);
 }
 
 internal sealed class ParamInfo
@@ -32,4 +43,6 @@ internal sealed class ParamInfo
     public string Name { get; set; } = string.Empty;
     public string? DefaultValue { get; set; }
     public bool IsBlackboard { get; set; }
+    public bool IsChildren { get; set; }
+    public bool IsChild { get; set; }
 }

@@ -30,8 +30,8 @@ internal static class Diagnostics
 
     public static DiagnosticDescriptor CST004 { get; } = new(
         id: "CST004",
-        title: "实现 IBehaviourCatalog 的 TreeBuilder 子类必须声明为 partial",
-        messageFormat: "类 '{0}' 实现了 IBehaviourCatalog<TCatalog> 但未声明为 partial，无法生成构建方法",
+        title: "包含 IBehaviourCatalog 实例的 TreeBuilder 子类必须声明为 partial",
+        messageFormat: "类 '{0}' 包含 IBehaviourCatalog 实例但未声明为 partial，无法生成构建方法",
         category: "CsTrees.FluentBuilder",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);

@@ -4,7 +4,7 @@ namespace CsTrees.Behaviours;
 /// Construction placeholder indicating an incomplete position in the behaviour tree.
 /// Always returns <see cref="Status.Invalid"/> to signal the node has not been defined yet.
 /// <para>
-/// Used by <see cref="FluentBuilder.TreeBuilder.Preview"/> to represent
+/// Used by <see cref="FluentBuilder.TreeBuilder&lt;TBuilder&gt;.Preview"/> to represent
 /// the current insertion point in an in-progress tree build.
 /// </para>
 /// </summary>

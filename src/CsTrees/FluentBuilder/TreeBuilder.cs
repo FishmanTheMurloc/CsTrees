@@ -332,10 +332,3 @@ public class TreeBuilder<TBuilder>
         return tree;
     }
 }
-
-/// <summary>
-/// Non-generic alias of <see cref="TreeBuilder{TBuilder}"/> for direct use.
-/// </summary>
-public class TreeBuilder : TreeBuilder<TreeBuilder>
-{
-}

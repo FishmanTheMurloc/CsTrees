@@ -16,22 +16,22 @@ public class TreeBuilderTests
     [Fact]
     public void Build_EmptyTree_ThrowsInvalidOperationException()
     {
-        var builder = new TreeBuilder();
+        var builder = new DefaultTreeBuilder();
         Assert.Throws<InvalidOperationException>(() => builder.Build());
     }
 
     [Fact]
     public void Build_SingleLeafAtRoot_ThrowsInvalidOperationException()
     {
-        var builder = new TreeBuilder();
+        var builder = new DefaultTreeBuilder();
         Assert.Throws<InvalidOperationException>(() => builder.Success("Test"));
     }
 
     [Fact]
     public void Build_SimpleSequence_ReturnsSequenceNode()
     {
-        var tree = new TreeBuilder()
-            .Sequence("Main")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Main", false)
                 .Success("Action1")
                 .Success("Action2")
             .End()
@@ -45,8 +45,8 @@ public class TreeBuilderTests
     [Fact]
     public void Build_SimpleSelector_ReturnsSelectorNode()
     {
-        var tree = new TreeBuilder()
-            .Selector("Main")
+        var tree = new DefaultTreeBuilder()
+            .Selector("Main", false)
                 .Success("Action1")
                 .Failure("Action2")
             .End()
@@ -60,9 +60,9 @@ public class TreeBuilderTests
     [Fact]
     public void Build_NestedComposites_ReturnsCorrectHierarchy()
     {
-        var tree = new TreeBuilder()
-            .Sequence("Root")
-                .Selector("Choice")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
+                .Selector("Choice", false)
                     .Success("Option1")
                     .Failure("Option2")
                 .End()
@@ -82,7 +82,7 @@ public class TreeBuilderTests
     [Fact]
     public void Build_DecoratorAsRoot_ReturnsDecoratorNode()
     {
-        var tree = new TreeBuilder()
+        var tree = new DefaultTreeBuilder()
             .Inverter("InvertRoot")
                 .Success("Action")
             .End()
@@ -96,8 +96,8 @@ public class TreeBuilderTests
     [Fact]
     public void Build_DecoratorInsideComposite_ReturnsCorrectStructure()
     {
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Inverter("Invert")
                     .Failure("Action")
                 .End()
@@ -112,8 +112,8 @@ public class TreeBuilderTests
     [Fact]
     public void Build_SequenceWithMemory_ReturnsSequenceWithMemoryEnabled()
     {
-        var tree = new TreeBuilder()
-            .SequenceWithMemory("Main")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Main", true)
                 .Success("Action1")
             .End()
             .Build();
@@ -125,8 +125,8 @@ public class TreeBuilderTests
     [Fact]
     public void Build_SelectorWithMemory_ReturnsSelectorWithMemoryEnabled()
     {
-        var tree = new TreeBuilder()
-            .SelectorWithMemory("Main")
+        var tree = new DefaultTreeBuilder()
+            .Selector("Main", true)
                 .Success("Action1")
             .End()
             .Build();
@@ -138,8 +138,8 @@ public class TreeBuilderTests
     [Fact]
     public void Build_Parallel_ReturnsParallelNode()
     {
-        var tree = new TreeBuilder()
-            .Parallel("Main")
+        var tree = new DefaultTreeBuilder()
+            .Parallel("Main", new ParallelPolicy.SuccessOnAll())
                 .Success("Action1")
                 .Success("Action2")
             .End()
@@ -153,7 +153,7 @@ public class TreeBuilderTests
     [Fact]
     public void Build_ParallelWithCustomPolicy_ReturnsParallelWithPolicy()
     {
-        var tree = new TreeBuilder()
+        var tree = new DefaultTreeBuilder()
             .Parallel("Main", new ParallelPolicy.SuccessOnOne())
                 .Success("Action1")
                 .Failure("Action2")
@@ -167,8 +167,8 @@ public class TreeBuilderTests
     [Fact]
     public void Build_MultipleDecorators_WrapsCorrectly()
     {
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Inverter("Inv1")
                     .Inverter("Inv2")
                         .Failure("Action")
@@ -186,8 +186,8 @@ public class TreeBuilderTests
     [Fact]
     public void Build_CustomLeafFactory_ReturnsCustomBehaviour()
     {
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Leaf(() => new CsTrees.Behaviours.Success("CustomAction"))
             .End()
             .Build();
@@ -200,15 +200,15 @@ public class TreeBuilderTests
     [Fact]
     public void End_NoCompositeToPop_ThrowsInvalidOperationException()
     {
-        var builder = new TreeBuilder();
+        var builder = new DefaultTreeBuilder();
         Assert.Throws<InvalidOperationException>(() => builder.End());
     }
 
     [Fact]
     public void Build_IncompleteTree_ThrowsInvalidOperationException()
     {
-        var builder = new TreeBuilder()
-            .Sequence("Root")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Success("Action");
         // Missing End()
 
@@ -224,9 +224,9 @@ public class TreeBuilderTests
     {
         var bb = new BB();
         
-        var tree = new TreeBuilder()
+        var tree = new DefaultTreeBuilder()
             .WithBlackboard(bb)
-                .Sequence("Root")
+                .Sequence("Root", false)
                     .Success("Action1")
                     .Success("Action2")
                 .End()
@@ -241,8 +241,8 @@ public class TreeBuilderTests
     {
         var bb = new BB();
         
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .WithBlackboard(bb)
                     .Success("Action1")
                 .End()
@@ -260,8 +260,8 @@ public class TreeBuilderTests
         var bb1 = new BB();
         var bb2 = new BB();
         
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .WithBlackboard(bb1)
                     .Success("Action1")
                 .End()
@@ -281,10 +281,10 @@ public class TreeBuilderTests
         var bb1 = new BB();
         var bb2 = new BB();
         
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .WithBlackboard(bb1)
-                    .Sequence("Branch1")
+                    .Sequence("Branch1", false)
                         .WithBlackboard(bb2)
                             .Success("Action1")
                         .End()
@@ -300,7 +300,7 @@ public class TreeBuilderTests
     [Fact]
     public void WithBlackboard_NullBlackboard_ThrowsArgumentNullException()
     {
-        var builder = new TreeBuilder();
+        var builder = new DefaultTreeBuilder();
         Assert.Throws<ArgumentNullException>(() => builder.WithBlackboard(null!));
     }
 
@@ -311,15 +311,15 @@ public class TreeBuilderTests
     [Fact]
     public void Preview_EmptyTree_ThrowsInvalidOperationException()
     {
-        var builder = new TreeBuilder();
+        var builder = new DefaultTreeBuilder();
         Assert.Throws<InvalidOperationException>(() => builder.Preview());
     }
 
     [Fact]
     public void Preview_CompleteTree_ReturnsSameAsBuild()
     {
-        var builder = new TreeBuilder()
-            .Sequence("Root")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Success("Action1")
                 .Success("Action2")
             .End();
@@ -337,8 +337,8 @@ public class TreeBuilderTests
     [Fact]
     public void Preview_IncompleteComposite_InsertsPlaceholderAndDoesNotConsumeBuilder()
     {
-        var builder = new TreeBuilder()
-            .Sequence("Root")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Success("Action1");
 
         // Preview should work without closing the scope
@@ -364,8 +364,8 @@ public class TreeBuilderTests
     [Fact]
     public void Preview_DecoratorWithoutChild_InsertsPlaceholderAndRestores()
     {
-        var builder = new TreeBuilder()
-            .Sequence("Root")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Inverter("Inv");
         // Inv has no child yet
 
@@ -392,9 +392,9 @@ public class TreeBuilderTests
     [Fact]
     public void Preview_NestedIncompleteComposites_InsertsSinglePlaceholderAtDeepest()
     {
-        var builder = new TreeBuilder()
-            .Sequence("Root")
-                .Sequence("Child");
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
+                .Sequence("Child", false);
 
         var previewTree = builder.Preview();
 
@@ -413,10 +413,10 @@ public class TreeBuilderTests
     [Fact]
     public void Preview_ProducesRenderableAsciiTree()
     {
-        var builder = new TreeBuilder()
-            .Sequence("MakePizza")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("MakePizza", false)
                 .Success("PrepareDough")
-                .Parallel("ParallelStep");
+                .Parallel("ParallelStep", new ParallelPolicy.SuccessOnAll());
 
         var previewTree = builder.Preview();
         var ascii = CsTrees.Display.Display.AsciiTree(previewTree, showStatus: false);
@@ -430,8 +430,8 @@ public class TreeBuilderTests
     [Fact]
     public void Preview_MultipleCalls_ReturnConsistentResults()
     {
-        var builder = new TreeBuilder()
-            .Sequence("Root")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Success("Action1");
 
         var preview1 = builder.Preview();
@@ -447,8 +447,8 @@ public class TreeBuilderTests
     [Fact]
     public void Preview_DecoratorWithChild_AddsPlaceholderToParentComposite()
     {
-        var builder = new TreeBuilder()
-            .Sequence("Root")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .Inverter("Inv")
                     .Success("Action");
         // Inv already has a child, but scope is still open
@@ -474,8 +474,8 @@ public class TreeBuilderTests
     public void Preview_BlackboardFrameOnTop_StillAddsPlaceholder()
     {
         var bb = new BB();
-        var builder = new TreeBuilder()
-            .Sequence("Root")
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false )
                 .WithBlackboard(bb)
                     .Success("Action1");
 

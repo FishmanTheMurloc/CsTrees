@@ -16,9 +16,9 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act - 使用 SG 生成的扩展方法
-        var tree = new TreeBuilder()
+        var tree = new DefaultTreeBuilder()
             .WithBlackboard(bb)
-                .Sequence("Main")
+                .Sequence("Main", false)
                     .PortTestSimpleOutput("Output1")
                     .PortTestSimpleOutput("Output2", labelKey: "custom_label")
                 .End()
@@ -39,8 +39,8 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .WithBlackboard(bb)
                     .PortTestSimpleOutput("Output", labelKey: "my_custom_key")
                 .End()
@@ -60,8 +60,8 @@ public class BuilderExtensionsTests
     {
         // Act & Assert
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            new TreeBuilder()
-                .Sequence("Main")
+            new DefaultTreeBuilder()
+                .Sequence("Main", false)
                     .PortTestSimpleOutput("Output")
                 .End()
                 .Build());
@@ -77,8 +77,8 @@ public class BuilderExtensionsTests
         var bb2 = new CsTrees.Blackboard.Blackboard();
 
         // Act
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .WithBlackboard(bb1)
                     .PortTestSimpleOutput("Output1")
                 .End()
@@ -107,8 +107,8 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act — 不传可选参数 tag，依赖默认值 null
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .WithBlackboard(bb)
                     .PortTestOptionalParam("Node", 5)
                 .End()
@@ -130,8 +130,8 @@ public class BuilderExtensionsTests
         var bb = new CsTrees.Blackboard.Blackboard();
 
         // Act — 显式传入可选参数 tag 和 port key
-        var tree = new TreeBuilder()
-            .Sequence("Root")
+        var tree = new DefaultTreeBuilder()
+            .Sequence("Root", false)
                 .WithBlackboard(bb)
                     .PortTestOptionalParam("Node", 3, tag: "myTag", resultKey: "custom_result")
                 .End()

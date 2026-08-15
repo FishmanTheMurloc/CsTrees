@@ -85,8 +85,8 @@ public sealed class BlackboardKeyGenerator : IIncrementalGenerator
         });
 
         // === Pipeline 3: TreeBuilder subclass preset methods ===
-        // Scans partial TreeBuilder subclasses implementing IBehaviourCatalog<TCatalog>,
-        // collects public factory methods from TCatalog, and generates public builder methods
+        // Scans partial TreeBuilder subclasses containing IBehaviourCatalog fields or properties,
+        // collects public factory methods from each catalog, and generates public builder methods
         // that delegate via the Catalog property (Leaf / LeafWithBlackboard).
         var builderSubclasses = context.SyntaxProvider
             .CreateSyntaxProvider(
@@ -101,7 +101,7 @@ public sealed class BlackboardKeyGenerator : IIncrementalGenerator
         });
 
         // === Diagnostics ===
-        // CST004: non-partial TreeBuilder subclass implementing IBehaviourCatalog
+        // CST004: non-partial TreeBuilder subclass containing IBehaviourCatalog instance
         var nonPartialSubclasses = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (node, _) => node is ClassDeclarationSyntax c && c.BaseList is not null,

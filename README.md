@@ -39,7 +39,7 @@ using CsTrees.FluentBuilder;
 
 var bb = new CsTrees.Blackboard.Blackboard();
 
-var tree = new TreeBuilder()
+var tree = new DefaultTreeBuilder()
     .Selector("Root")
         .Sequence("Check & Act")
             .WithBlackboard(bb)
@@ -120,7 +120,7 @@ public partial class DetectButton : Behaviour
 
 ```csharp
 // 生成的扩展方法使用方式
-var tree = new TreeBuilder()
+var tree = new DefaultTreeBuilder()
     .Sequence("Pipeline")
         .WithBlackboard(bb)
             .DetectButton("检测按钮")  // SG 生成的扩展方法，bb 自动注入
@@ -155,16 +155,16 @@ readAccess.Unset();
 
 TreeBuilder 提供基于栈的声明式 API，是更流行的选择。
 
-```csharp
-using CsTrees.FluentBuilder;
+### 使用 DefaultTreeBuilder
 
-var tree = new TreeBuilder()
-    .Selector("Root")
-        .Sequence("Check & Act")
-            .Success("Condition")
-            .Failure("Action")
+`DefaultTreeBuilder` 是框架内置的构建器，内置三个 Catalog（CompositesCatalog、DecoratorsCatalog、DefaultBehavioursCatalog），涵盖了所有标准节点类型。大多数情况下直接使用即可：
+
+```csharp
+var tree = new DefaultTreeBuilder()
+    .Sequence("Root")
+        .Retry("Attempt", numFailures: 3)
+            .Success("Action")
         .End()
-        .Failure("Fallback")
     .End()
     .Build();
 ```
@@ -178,7 +178,7 @@ var tree = new TreeBuilder()
 ```csharp
 var bb = new Blackboard();
 
-var tree = new TreeBuilder()
+var tree = new DefaultTreeBuilder()
     .Selector("Root")
         .Sequence("Pipeline")
             .WithBlackboard(bb)
@@ -196,12 +196,12 @@ var tree = new TreeBuilder()
 `Preview()` 方法可以在构建过程中随时预览当前的树结构：
 
 ```csharp
-var builder = new TreeBuilder()
+var builder = new DefaultTreeBuilder()
     .Selector("Root")
         .Sequence("Part1")
             .Success("Step1");
 
-// 预览当前状态（Part1 未 End）
+// 预览当前状态（Part1 未闭合）
 var preview = builder.Preview();
 Console.WriteLine(Display.AsciiTree(preview));
 
@@ -217,49 +217,46 @@ builder
 
 TreeBuilder 基于 CRTP 模式实现为泛型基类 `TreeBuilder<TBuilder>`，支持继承以创建领域特定的行为树构建器。
 
-### 基础继承
-
-```csharp
-public class MyBuilder : TreeBuilder<MyBuilder>
-{
-}
-
-var tree = new MyBuilder()
-    .Sequence("Root")
-        .Success("Action")
-    .End()
-    .Build();
-```
-
-继承后，所有扩展方法返回的是派生类型 `MyBuilder`，可在继承链上继续添加自定义方法。
+框架自带 `DefaultTreeBuilder`，内置了常用的 Composites、Decorators、Leaf 节点，直接可用。你也可以通过继承 `TreeBuilder<TBuilder>` 自定义领域构建器。
 
 ### 通过 `IBehaviourCatalog` 自动生成构建方法
 
-对于业务预设行为树，推荐使用 `IBehaviourCatalog<TCatalog>` 模式。源生成器会扫描 Catalog 中的 public 工厂方法，自动为 TreeBuilder 子类生成对应的构建方法：
+源生成器会扫描 `TreeBuilder<TBuilder>` 子类中声明的私有 `IBehaviourCatalog` 类型字段或属性，自动为 Catalog 中的每个 public 工厂方法生成对应的 fluent 构建方法。
+
+支持同时使用多个 Catalog，意味着你可以**拼配**构建器的能力。
 
 ```csharp
 // 1. 定义行为目录类
-public class GameCatalog
+public class GameComposites : IBehaviourCatalog
 {
-    // 工厂方法：不含 Blackboard 参数
+    public Composite CombatSequence(string name, bool memory, IEnumerable<Behaviour> children)
+        => new Composites.Sequence(name, memory, children);
+}
+
+public class GameBehaviours : IBehaviourCatalog
+{
     public Behaviour MakePlayerIdle(string name) => new Idle(name);
 
-    // 工厂方法：含 Blackboard 参数，生成的构建方法会自动注入作用域 bb
     public Behaviour MakeCollectItem(string name, Blackboard bb)
         => new CollectItem(name, bb);
 }
 
 // 2. 定义领域构建器
-public partial class GameBuilder : TreeBuilder<GameBuilder>, IBehaviourCatalog<GameCatalog>
+public partial class GameBuilder : TreeBuilder<GameBuilder>
 {
-    public GameCatalog Catalog { get; } = new();
+    private readonly CompositesCatalog compositesCatalog = new();
+    private readonly DecoratorsCatalog decoratorsCatalog = new();
+    private readonly GameComposites gameComposites = new();
+    private readonly GameBehaviours gameBehaviours = new();
 }
 
-// 3. 使用（MakePlayerIdle 和 MakeCollectItem 由 SG 自动生成）
+// 3. 使用
 var tree = new GameBuilder()
-    .Sequence("Gameplay")
-        .MakePlayerIdle("待机")
-        .MakeCollectItem("拾取物品")  // bb 自动注入
+    .CombatSequence("Gameplay")
+        .Sequence("顺序执行", memory: true)
+            .MakePlayerIdle("待机")
+            .MakeCollectItem("拾取物品")
+        .End()
     .End()
     .Build();
 ```
@@ -267,8 +264,9 @@ var tree = new GameBuilder()
 Catalog 工厂方法的参数规则：
 
 - 返回类型必须为 `Behaviour` 或其子类
-- 如果参数中包含 `Blackboard` 类型，生成的构建方法会通过 `LeafWithBlackboard` 自动注入当前作用域的黑板
-- 不含 `Blackboard` 参数的工厂方法，生成的构建方法通过 `Leaf` 直接添加节点
+- 如果参数中包含 `Blackboard` 类型，生成的构建方法会自动注入当前作用域的黑板
+- 如果参数中包含 `IEnumerable<Behaviour>` 类型，会被识别为 Composite 的 children 参数
+- 如果参数中包含 `Behaviour` 类型，会被识别为 Decorator 的 child 参数
 - 参数默认值会被保留到生成的方法签名中
 
 > `[GenerateTreeBuilderExtension]` 和 `IBehaviourCatalog` 是两种互补的代码生成路径：前者生成**全局静态扩展方法**，适合通用行为；后者生成**实例方法**挂在领域构建器上，适合业务预设。
