@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Version>1.0.0</Version>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Description>MEAI integration for CsTrees behaviour tree framework</Description>
+    <Authors>FishmanTheMurloc(with AI)</Authors>
+    <RepositoryUrl>https://github.com/FishmanTheMurloc/CsTrees</RepositoryUrl>
+    <PackageTags>behaviour-tree;btree;meai;agents-ai</PackageTags>
+    <PackageProjectUrl>https://github.com/FishmanTheMurloc/CsTrees</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CsTrees\CsTrees.csproj" />
+    <None Include="..\CsTrees.MEAI.SourceGenerator\bin\$(Configuration)\netstandard2.0\CsTrees.MEAI.SourceGenerator.dll"
+		  Pack="true"
+		  PackagePath="analyzers/dotnet/cs/"
+		  Visible="false" />
+    <ProjectReference Include="..\CsTrees.MEAI.SourceGenerator\CsTrees.MEAI.SourceGenerator.csproj"
+					  OutputItemType="Analyzer"
+					  ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

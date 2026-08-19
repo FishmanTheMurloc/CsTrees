@@ -271,6 +271,10 @@ Catalog 工厂方法的参数规则：
 
 > `[GenerateTreeBuilderExtension]` 和 `IBehaviourCatalog` 是两种互补的代码生成路径：前者生成**全局静态扩展方法**，适合通用行为；后者生成**实例方法**挂在领域构建器上，适合业务预设。
 
+## 扩展包
+
+- **[CsTrees.MEAI](src/CsTrees.MEAI/README.md)** — 将 TreeBuilder 的 `IBehaviourCatalog` 工厂方法自动转换为 AI Agent 可调用的工具方法（配合 Microsoft.Extensions.AI 使用），让 LLM 能逐步构建和运行行为树。
+
 ## 许可证
 
 MIT
