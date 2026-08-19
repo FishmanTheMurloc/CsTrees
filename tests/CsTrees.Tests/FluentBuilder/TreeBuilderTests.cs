@@ -335,7 +335,7 @@ public class TreeBuilderTests
     }
 
     [Fact]
-    public void Preview_IncompleteComposite_InsertsPlaceholderAndDoesNotConsumeBuilder()
+    public void Preview_IncompleteCompositeWithExistingChildren_NoPlaceholderInserted()
     {
         var builder = new DefaultTreeBuilder()
             .Sequence("Root", false)
@@ -346,9 +346,9 @@ public class TreeBuilderTests
 
         var sequence = Assert.IsType<Sequence>(previewTree);
         Assert.Equal("Root", sequence.Name);
-        // Action1 + Placeholder = 2 children
-        Assert.Equal(2, sequence.Children.Count);
-        Assert.IsType<Placeholder>(sequence.Children[1]);
+        // Composite already has children, no Placeholder inserted
+        Assert.Single(sequence.Children);
+        Assert.IsType<Success>(sequence.Children[0]);
 
         // Builder should still be usable — can continue adding nodes
         builder.Success("Action2");
@@ -390,7 +390,7 @@ public class TreeBuilderTests
     }
 
     [Fact]
-    public void Preview_NestedIncompleteComposites_InsertsSinglePlaceholderAtDeepest()
+    public void Preview_NestedIncompleteComposites_NoPlaceholderInserted()
     {
         var builder = new DefaultTreeBuilder()
             .Sequence("Root", false)
@@ -400,13 +400,8 @@ public class TreeBuilderTests
 
         var root = Assert.IsType<Sequence>(previewTree);
         var child = Assert.IsType<Sequence>(root.Children[0]);
-        // Only one placeholder at the deepest composite
-        Assert.Single(child.Children);
-        Assert.IsType<Placeholder>(child.Children[0]);
-
-        // Root also got a placeholder (for the next insertion point after "Child")
-        // Actually, only the topmost frame gets a placeholder
-        // Root has one child: "Child" composite + the placeholder is in "Child"
+        // Composites can be empty, no Placeholder inserted
+        Assert.Empty(child.Children);
         Assert.Single(root.Children);
     }
 
@@ -415,16 +410,14 @@ public class TreeBuilderTests
     {
         var builder = new DefaultTreeBuilder()
             .Sequence("MakePizza", false)
-                .Success("PrepareDough")
-                .Parallel("ParallelStep", new ParallelPolicy.SuccessOnAll());
+                .Inverter("Inv");
 
         var previewTree = builder.Preview();
         var ascii = CsTrees.Display.Display.AsciiTree(previewTree, showStatus: false);
 
         Assert.Contains("MakePizza", ascii);
-        Assert.Contains("PrepareDough", ascii);
-        Assert.Contains("ParallelStep", ascii);
-        Assert.Contains("...", ascii); // Placeholder name
+        Assert.Contains("Inv", ascii);
+        Assert.Contains("...", ascii); // Placeholder inserted for decorator without child
     }
 
     [Fact]
@@ -445,33 +438,31 @@ public class TreeBuilderTests
     }
 
     [Fact]
-    public void Preview_DecoratorWithChild_AddsPlaceholderToParentComposite()
+    public void Preview_DecoratorWithChild_NoPlaceholderAdded()
     {
         var builder = new DefaultTreeBuilder()
             .Sequence("Root", false)
                 .Inverter("Inv")
                     .Success("Action");
-        // Inv already has a child, but scope is still open
+        // Inv already has a child, Root already has children, no Placeholder needed
 
         var previewTree = builder.Preview();
 
         var root = Assert.IsType<Sequence>(previewTree);
-        // Inv + Placeholder = 2 children in Root
-        Assert.Equal(2, root.Children.Count);
+        // Only Inv, no Placeholder (composite already has children)
+        Assert.Single(root.Children);
         Assert.IsType<Inverter>(root.Children[0]);
-        Assert.IsType<Placeholder>(root.Children[1]);
 
         // Builder is still usable
         builder.End();
         builder.End();
         var builtTree = builder.Build();
         var builtRoot = Assert.IsType<Sequence>(builtTree);
-        // Only Inv, no placeholder
         Assert.Single(builtRoot.Children);
     }
 
     [Fact]
-    public void Preview_BlackboardFrameOnTop_StillAddsPlaceholder()
+    public void Preview_BlackboardFrameOnTop_NoPlaceholderWhenCompositeHasChildren()
     {
         var bb = new BB();
         var builder = new DefaultTreeBuilder()
@@ -482,8 +473,311 @@ public class TreeBuilderTests
         var previewTree = builder.Preview();
 
         var root = Assert.IsType<Sequence>(previewTree);
-        // Action1 + Placeholder = 2 children
-        Assert.Equal(2, root.Children.Count);
-        Assert.IsType<Placeholder>(root.Children[1]);
+        // Composite already has children, no Placeholder inserted
+        Assert.Single(root.Children);
+        Assert.IsType<Success>(root.Children[0]);
+    }
+
+    // ========================================================================
+    // Checkpoint + ResetTo tests
+    // ========================================================================
+
+    [Fact]
+    public void Checkpoint_ResetTo_InvalidCheckpoint_ThrowsArgumentOutOfRangeException()
+    {
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
+                .Success("Action1")
+            .End();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.ResetTo(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.ResetTo(999));
+    }
+
+    [Fact]
+    public void Checkpoint_ResetTo_CurrentPosition_NoOp()
+    {
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
+                .Success("Action1")
+            .End();
+
+        var cp = builder.Checkpoint();
+        builder.ResetTo(cp);
+
+        var tree = builder.Build();
+        var root = Assert.IsType<Sequence>(tree);
+        Assert.Single(root.Children);
+    }
+
+    [Fact]
+    public void Checkpoint_ResetTo_ComplexFork_MultipleBranchesFromSameCheckpoint()
+    {
+        var bb = new BB();
+
+        // ---- Build common prefix (fully closed) ----
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
+                .WithBlackboard(bb)
+                    .Selector("Choice", false)
+                        .Success("AlwaysFirst")
+                    .End()
+                .End();
+
+        var cp = builder.Checkpoint();
+
+        // ---- Branch A: add nested composite → decorator → leaf, then build ----
+        var treeA = builder
+            .Sequence("BranchA", false)
+                .Inverter("InvertA")
+                    .Failure("FlipA")
+                .End()
+            .End()
+            .End()
+            .Build();
+
+        var rootA = Assert.IsType<Sequence>(treeA);
+        Assert.Equal(2, rootA.Children.Count);
+        var seqA = Assert.IsType<Sequence>(rootA.Children[1]);
+        Assert.Equal("BranchA", seqA.Name);
+        Assert.Single(seqA.Children);
+        Assert.IsType<Inverter>(seqA.Children[0]);
+
+        // ---- Reset to cp, add Branch B ----
+        builder.ResetTo(cp);
+
+        var treeB = builder
+            .Parallel("BranchB", new ParallelPolicy.SuccessOnOne())
+                .Success("Option1")
+                .Failure("Option2")
+            .End()
+            .End()
+            .Build();
+
+        var rootB = Assert.IsType<Sequence>(treeB);
+        Assert.Equal(2, rootB.Children.Count);
+        var parallelB = Assert.IsType<Parallel>(rootB.Children[1]);
+        Assert.Equal("BranchB", parallelB.Name);
+        Assert.Equal(2, parallelB.Children.Count);
+
+        // ---- Reset to cp again, add Branch C ----
+        builder.ResetTo(cp);
+
+        var treeC = builder
+            .Selector("BranchC", false)
+                .Leaf(() => new CsTrees.Behaviours.Running("Pending"))
+            .End()
+            .End()
+            .Build();
+
+        var rootC = Assert.IsType<Sequence>(treeC);
+        Assert.Equal(2, rootC.Children.Count);
+        var selectorC = Assert.IsType<Selector>(rootC.Children[1]);
+        Assert.Equal("BranchC", selectorC.Name);
+        Assert.Single(selectorC.Children);
+        Assert.IsType<Running>(selectorC.Children[0]);
+    }
+
+    [Fact]
+    public void Checkpoint_ResetTo_NestedUnfinishedScopes_PreservesFrameStack()
+    {
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
+                .Success("Before");
+
+        var cp = builder.Checkpoint();
+
+        // Branch 1: nested decorator + leaf
+        builder
+            .Inverter("Inv")
+                .Success("InsideInv")
+            .End();
+
+        var tree1 = builder.End().Build();
+        var root1 = Assert.IsType<Sequence>(tree1);
+        Assert.Equal(2, root1.Children.Count);
+        Assert.IsType<Inverter>(root1.Children[1]);
+
+        // Reset to cp, add different nested composite
+        builder.ResetTo(cp);
+
+        builder
+            .Selector("AltChoice", false)
+                .Success("Alt1")
+                .Success("Alt2")
+            .End();
+
+        var tree2 = builder.End().Build();
+        var root2 = Assert.IsType<Sequence>(tree2);
+        Assert.Equal(2, root2.Children.Count);
+        var alt = Assert.IsType<Selector>(root2.Children[1]);
+        Assert.Equal("AltChoice", alt.Name);
+        Assert.Equal(2, alt.Children.Count);
+    }
+
+    [Fact]
+    public void Checkpoint_ResetTo_ThroughBlackboardScope_CorrectlyRestores()
+    {
+        var bb1 = new BB();
+        var bb2 = new BB();
+
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false)
+                .WithBlackboard(bb1)
+                    .Success("InBb1")
+                .End();
+
+        var cp = builder.Checkpoint();
+
+        // Branch A: push another blackboard scope + leaf
+        builder
+            .WithBlackboard(bb2)
+                .Success("InBb2")
+            .End()
+            .End();
+
+        var treeA = builder.Build();
+        var rootA = Assert.IsType<Sequence>(treeA);
+        Assert.Equal(2, rootA.Children.Count);
+
+        // Reset — blackboard scope should be gone
+        builder.ResetTo(cp);
+
+        // Push a different blackboard + nested composite
+        var bb3 = new BB();
+        builder
+            .WithBlackboard(bb3)
+                .Selector("S3", false)
+                    .Success("InBb3")
+                .End()
+            .End()
+            .End();
+
+        var treeB = builder.Build();
+        var rootB = Assert.IsType<Sequence>(treeB);
+        Assert.Equal(2, rootB.Children.Count);
+        var s3 = Assert.IsType<Selector>(rootB.Children[1]);
+        Assert.Equal("S3", s3.Name);
+    }
+
+    [Fact]
+    public void Checkpoint_ResetTo_FullResetToZero_ErasesEverything()
+    {
+        var builder = new DefaultTreeBuilder();
+        var cp = builder.Checkpoint(); // cp == 0
+
+        builder
+            .Sequence("Root", false)
+                .Success("Action1")
+            .End();
+
+        // Reset to 0 BEFORE building — everything should be erased
+        builder.ResetTo(cp);
+
+        // Frame stack and root should be empty
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        // Build a fresh tree from scratch
+        var newTree = builder
+            .Selector("Fresh", false)
+                .Failure("NewAction")
+            .End()
+            .Build();
+
+        Assert.IsType<Selector>(newTree);
+        Assert.Equal("Fresh", newTree.Name);
+    }
+
+    [Fact]
+    public void Checkpoint_ResetTo_MultipleCheckpoints_ChainedResets()
+    {
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Root", false);
+
+        var cp0 = builder.Checkpoint();
+
+        builder.Success("First");
+        var cp1 = builder.Checkpoint();
+
+        builder.Success("Second");
+        var cp2 = builder.Checkpoint();
+
+        builder.Success("Third");
+        var cp3 = builder.Checkpoint();
+
+        // Reset to cp1 → only "First" remains
+        builder.ResetTo(cp1);
+        builder.End();
+        var t1 = builder.Build();
+        Assert.Equal(1, ((Sequence)t1).Children.Count);
+
+        // Reset to cp0 → no children
+        builder.ResetTo(cp0);
+        builder.End();
+        var t0 = builder.Build();
+        Assert.Equal(0, ((Sequence)t0).Children.Count);
+
+        // cp3 > current op count after reset — should fail
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.ResetTo(cp3));
+
+        // Rebuild to cp2-equivalent state
+        builder.ResetTo(cp0);
+        builder.Success("First");
+        builder.Success("Second");
+        var t2 = builder.End().Build();
+        Assert.Equal(2, ((Sequence)t2).Children.Count);
+    }
+
+    [Fact]
+    public void Checkpoint_ResetTo_DiamondPattern_TwoNestedBranchesThenMerge()
+    {
+        // Simulates: build shared prefix → checkpoint → two fork paths → both build valid trees
+        var builder = new DefaultTreeBuilder()
+            .Sequence("Mission", false)
+                .Success("Initialize")
+            ;
+
+        var forkPoint = builder.Checkpoint();
+
+        // Fork 1: attack path (Sequence of actions under a Retry decorator)
+        var attackTree = builder
+            .Retry("RetryAttack", 3)
+                .Sequence("AttackChain", false)
+                    .Success("Aim")
+                    .Success("Fire")
+                .End()
+            .End()
+            .End()
+            .Build();
+
+        var mission = Assert.IsType<Sequence>(attackTree);
+        Assert.Equal(2, mission.Children.Count);
+        var retry = Assert.IsType<Retry>(mission.Children[1]);
+        Assert.Equal("RetryAttack", retry.Name);
+        var attackChain = Assert.IsType<Sequence>(retry.Children[0]);
+        Assert.Equal("AttackChain", attackChain.Name);
+        Assert.Equal(2, attackChain.Children.Count);
+
+        // Reset to fork point
+        builder.ResetTo(forkPoint);
+
+        // Fork 2: retreat path (Selector with multiple escape options)
+        var retreatTree = builder
+            .Selector("RetreatOptions", false)
+                .Inverter("CheckSafe")
+                    .Failure("IsDangerous")
+                .End()
+                .Success("RunAway")
+            .End()
+            .End()
+            .Build();
+
+        mission = Assert.IsType<Sequence>(retreatTree);
+        Assert.Equal(2, mission.Children.Count);
+        var retreatOpts = Assert.IsType<Selector>(mission.Children[1]);
+        Assert.Equal("RetreatOptions", retreatOpts.Name);
+        Assert.Equal(2, retreatOpts.Children.Count);
+        var checkSafe = Assert.IsType<Inverter>(retreatOpts.Children[0]);
+        Assert.Equal("CheckSafe", checkSafe.Name);
     }
 }

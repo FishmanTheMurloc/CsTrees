@@ -55,7 +55,44 @@ public class TreeBuilder<TBuilder>
         public Blackboard Blackboard { get; set; } = null!;
     }
 
+    // 追加式操作日志：记录每一次改动（含 leaf、end），为 Checkpoint/ResetTo 提供可逆历史。
+    private abstract class Op { }
+
+    /// <summary>
+    /// PushComposite / PushDecorator 产生的记录。父节点通过 <see cref="NodeBuilder.Parent"/> 获取。
+    /// </summary>
+    private sealed class NodePushOp : Op
+    {
+        public NodeBuilder Builder { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// WithBlackboard 产生的记录。
+    /// </summary>
+    private sealed class BlackboardPushOp : Op
+    {
+        public Blackboard Blackboard { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Leaf / LeafWithBlackboard 产生的记录。父节点通过 <see cref="NodeBuilder.Parent"/> 获取。
+    /// </summary>
+    private sealed class LeafOp : Op
+    {
+        public NodeBuilder Leaf { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// End 产生的记录。ClosedFrame 为被弹出的帧，SetRoot 标记该次 End 是否设置了根节点。
+    /// </summary>
+    private sealed class EndOp : Op
+    {
+        public Frame ClosedFrame { get; set; } = null!;
+        public bool SetRoot { get; set; }
+    }
+
     private readonly Stack<Frame> _frameStack = new();
+    private readonly List<Op> _operations = new();
     private NodeBuilder? _root;
 
     /// <summary>
@@ -64,9 +101,14 @@ public class TreeBuilder<TBuilder>
     protected TreeBuilder() { }
 
     /// <summary>
+    /// 当前帧栈高度，供外部（如 BuildToolsBase）判断未关闭的作用域数量。
+    /// </summary>
+    public int FrameCount => _frameStack.Count;
+
+    /// <summary>
     /// Get the current blackboard from the nearest blackboard frame in the stack.
     /// </summary>
-    private Blackboard? GetCurrentBlackboard()
+    public Blackboard? GetCurrentBlackboard()
     {
         foreach (var frame in _frameStack)
         {
@@ -112,6 +154,7 @@ public class TreeBuilder<TBuilder>
             decoratorParent.SetChild(builder);
 
         _frameStack.Push(new CompositeFrame { Builder = builder });
+        _operations.Add(new NodePushOp { Builder = builder });
         return Self;
     }
 
@@ -132,6 +175,7 @@ public class TreeBuilder<TBuilder>
             decoratorParent.SetChild(builder);
 
         _frameStack.Push(new DecoratorFrame { Builder = builder });
+        _operations.Add(new NodePushOp { Builder = builder });
         return Self;
     }
 
@@ -147,6 +191,7 @@ public class TreeBuilder<TBuilder>
             throw new ArgumentNullException(nameof(blackboard));
 
         _frameStack.Push(new BlackboardFrame { Blackboard = blackboard });
+        _operations.Add(new BlackboardPushOp { Blackboard = blackboard });
         return Self;
     }
 
@@ -170,6 +215,7 @@ public class TreeBuilder<TBuilder>
         else
             throw new InvalidOperationException($"Cannot add leaf child to {parent.GetType().Name}");
 
+        _operations.Add(new LeafOp { Leaf = builder });
         return Self;
     }
 
@@ -195,6 +241,7 @@ public class TreeBuilder<TBuilder>
         else
             throw new InvalidOperationException($"Cannot add leaf child to {parent.GetType().Name}");
 
+        _operations.Add(new LeafOp { Leaf = builder });
         return Self;
     }
 
@@ -209,9 +256,7 @@ public class TreeBuilder<TBuilder>
 
         var completed = _frameStack.Pop();
 
-        // If we just popped a blackboard frame, we're done
-        if (completed is BlackboardFrame)
-            return Self;
+        bool setRoot = false;
 
         // If we popped a composite or decorator, check if this is the root
         if (completed is CompositeFrame or DecoratorFrame)
@@ -221,17 +266,77 @@ public class TreeBuilder<TBuilder>
 
             if (!hasMoreNodeFrames)
             {
-                // No more node frames, this is the root
                 _root = completed switch
                 {
                     CompositeFrame cf => cf.Builder,
                     DecoratorFrame df => df.Builder,
                     _ => throw new InvalidOperationException("Unexpected frame type.")
                 };
+                setRoot = true;
             }
         }
 
+        _operations.Add(new EndOp { ClosedFrame = completed, SetRoot = setRoot });
         return Self;
+    }
+
+    /// <summary>
+    /// 记录当前构建进度，返回检查点 id（等于操作日志的下标）。
+    /// </summary>
+    /// <returns>可用于 <see cref="ResetTo(int)"/> 的检查点 id。</returns>
+    public int Checkpoint() => _operations.Count;
+
+    /// <summary>
+    /// 回滚到指定检查点：逆序撤销该检查点之后的所有操作（push、leaf、blackboard、end），
+    /// 使 builder 精确恢复到检查点时刻的状态，之后可继续构建（分叉）。
+    /// </summary>
+    /// <param name="checkpoint">由 <see cref="Checkpoint"/> 返回的检查点 id。</param>
+    /// <returns>This builder for method chaining.</returns>
+    public TBuilder ResetTo(int checkpoint)
+    {
+        if (checkpoint < 0 || checkpoint > _operations.Count)
+            throw new ArgumentOutOfRangeException(nameof(checkpoint));
+
+        // 逆序回放：从当前末尾撤销到 checkpoint
+        for (int i = _operations.Count - 1; i >= checkpoint; i--)
+        {
+            switch (_operations[i])
+            {
+                case NodePushOp push:
+                    // 逆序回放时它压入的帧必在栈顶：先弹帧，再从父节点移除
+                    _frameStack.Pop();
+                    RemoveFromParent(push.Builder.Parent);
+                    break;
+
+                case LeafOp leaf:
+                    RemoveFromParent(leaf.Leaf.Parent);
+                    break;
+
+                case BlackboardPushOp:
+                    _frameStack.Pop();
+                    break;
+
+                case EndOp end:
+                    if (end.SetRoot)
+                        _root = null;
+                    _frameStack.Push(end.ClosedFrame);
+                    break;
+            }
+        }
+
+        _operations.RemoveRange(checkpoint, _operations.Count - checkpoint);
+        return Self;
+    }
+
+    /// <summary>
+    /// 从父节点移除"刚添加"的节点：composite 移除末尾子节点，decorator 清空子节点。
+    /// </summary>
+    private static void RemoveFromParent(NodeBuilder? parent)
+    {
+        if (parent is CompositeBuilder composite)
+            composite.RemoveLastChild();
+        else if (parent is DecoratorBuilder decorator)
+            decorator.ClearChild();
     }
 
     /// <summary>
@@ -255,8 +360,9 @@ public class TreeBuilder<TBuilder>
     /// Preview the current state of the tree being built without consuming the builder.
     /// <para>
     /// Closes all open scopes, inserts a <see cref="Behaviours.Placeholder"/>
-    /// at the current insertion point if needed, builds the tree, renders it,
-    /// and then restores the builder to its previous state so construction can continue.
+    /// only when the current decorator has no child yet (which would cause Build to fail),
+    /// builds the tree, and then restores the builder to its previous state
+    /// so construction can continue.
     /// </para>
     /// </summary>
     /// <returns>The built behaviour tree representing the current construction state.</returns>
@@ -266,69 +372,32 @@ public class TreeBuilder<TBuilder>
         if (_frameStack.Count == 0 && _root is null)
             throw new InvalidOperationException("Tree is empty. Add at least one node.");
 
-        // Save current state
-        var savedStack = new Stack<Frame>(_frameStack.Reverse());
-        var savedRoot = _root;
-
-        // Always add a placeholder at the current insertion point
-        bool placeholderAdded = false;
-        DecoratorBuilder? placeholderDecoratorParent = null;
-        CompositeBuilder? placeholderCompositeParent = null;
-
-        if (_frameStack.Count > 0)
+        int checkpoint = Checkpoint();
+        try
         {
-            // Walk the stack from top to find where to insert the placeholder:
-            // - CompositeFrame → add as next child
-            // - DecoratorFrame without child → add as child
-            // - DecoratorFrame with child → skip, look at parent (next node will be a sibling)
-            // - BlackboardFrame → skip, not a node frame
+            // 仅当 decorator 尚没有子节点时插入占位叶子（否则 Build 会失败），
+            // composite 可以没有子节点，不需要 Placeholder。
             foreach (var frame in _frameStack)
             {
-                if (frame is CompositeFrame cf)
+                if (frame is CompositeFrame)
+                    break;
+                if (frame is DecoratorFrame { Builder.HasChild: false })
                 {
-                    var placeholder = new LeafBuilder(() => new Placeholder());
-                    cf.Builder.AddChild(placeholder);
-                    placeholderAdded = true;
-                    placeholderCompositeParent = cf.Builder;
+                    Leaf(() => new Placeholder());
                     break;
                 }
-                if (frame is DecoratorFrame df)
-                {
-                    if (!df.Builder.HasChild)
-                    {
-                        var placeholder = new LeafBuilder(() => new Placeholder());
-                        df.Builder.SetChild(placeholder);
-                        placeholderAdded = true;
-                        placeholderDecoratorParent = df.Builder;
-                        break;
-                    }
-                    // Decorator already has a child — keep walking up the stack
-                }
             }
+
+            // 正常收尾
+            while (_frameStack.Count > 0)
+                End();
+
+            return Build();
         }
-
-        // Close all open scopes
-        while (_frameStack.Count > 0)
-            End();
-
-        // Build the tree
-        var tree = Build();
-
-        // Restore state
-        _frameStack.Clear();
-        foreach (var frame in savedStack.Reverse())
-            _frameStack.Push(frame);
-        _root = savedRoot;
-
-        // Remove placeholder from builder tree
-        if (placeholderAdded)
+        finally
         {
-            if (placeholderDecoratorParent is not null)
-                placeholderDecoratorParent.ClearChild();
-            else if (placeholderCompositeParent is not null)
-                placeholderCompositeParent.RemoveLastChild();
+            // 一步回滚到检查点：撤销占位与临时 End，恢复全部状态
+            ResetTo(checkpoint);
         }
-
-        return tree;
     }
 }

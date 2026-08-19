@@ -8,6 +8,11 @@ namespace CsTrees.FluentBuilder;
 public abstract class NodeBuilder
 {
     /// <summary>
+    /// The parent node of this node, or <c>null</c> if this node is the root.
+    /// </summary>
+    internal NodeBuilder? Parent { get; set; }
+
+    /// <summary>
     /// Build the actual behaviour node.
     /// </summary>
     public abstract Behaviour Build();
@@ -54,7 +59,12 @@ public sealed class CompositeBuilder : NodeBuilder
     /// Adds a child node builder to this composite.
     /// </summary>
     /// <param name="child">The child node builder to add.</param>
-    public void AddChild(NodeBuilder child) => _children.Add(child ?? throw new ArgumentNullException(nameof(child)));
+    public void AddChild(NodeBuilder child)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        child.Parent = this;
+        _children.Add(child);
+    }
 
     /// <summary>
     /// Whether this composite builder has any children.
@@ -65,7 +75,12 @@ public sealed class CompositeBuilder : NodeBuilder
     /// Remove the last added child. Used by <see cref="TreeBuilder&lt;TBuilder&gt;.Preview"/>
     /// to undo temporary placeholder insertion.
     /// </summary>
-    internal void RemoveLastChild() => _children.RemoveAt(_children.Count - 1);
+    internal void RemoveLastChild()
+    {
+        var child = _children[^1];
+        child.Parent = null;
+        _children.RemoveAt(_children.Count - 1);
+    }
 
     /// <inheritdoc />
     public override Behaviour Build()
@@ -96,7 +111,16 @@ public sealed class DecoratorBuilder : NodeBuilder
     /// Sets the child node builder for this decorator.
     /// </summary>
     /// <param name="child">The child node builder.</param>
-    public void SetChild(NodeBuilder child) => _child = child ?? throw new ArgumentNullException(nameof(child));
+    /// <exception cref="ArgumentNullException"><paramref name="child"/> is <c>null</c>.</exception>
+    /// <exception cref="InvalidOperationException">This decorator already has a child.</exception>
+    public void SetChild(NodeBuilder child)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        if (_child is not null)
+            throw new InvalidOperationException("Decorator already has a child.");
+        child.Parent = this;
+        _child = child;
+    }
 
     /// <summary>
     /// Whether this decorator builder has a child.
@@ -107,7 +131,12 @@ public sealed class DecoratorBuilder : NodeBuilder
     /// Clear the child reference. Used by <see cref="TreeBuilder&lt;TBuilder&gt;.Preview"/>
     /// to undo temporary placeholder insertion.
     /// </summary>
-    internal void ClearChild() => _child = null;
+    internal void ClearChild()
+    {
+        if (_child is not null)
+            _child.Parent = null;
+        _child = null;
+    }
 
     /// <inheritdoc />
     public override Behaviour Build()
