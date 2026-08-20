@@ -265,9 +265,14 @@ public sealed class Blackboard
         || value.GetType().IsEnum;
 
     /// <summary>
-    /// Clear all key-value pairs from the blackboard.
+    /// 完全清空黑板中的键值对、访问授权信息以及活动流（如果存在）。
     /// </summary>
-    public void Clear() => _storage.Clear();
+    public void Clear()
+    {
+        _storage.Clear();
+        _behaviourKeyAccesses.Clear();
+        ActivityStream = null;
+    }
 
     /// <summary>
     /// Get all key-value items from the blackboard.
