@@ -119,6 +119,20 @@ public class TreeBuilder<TBuilder>
     }
 
     /// <summary>
+    /// Get all distinct blackboards referenced by the current build operations.
+    /// Includes blackboards from both open and closed scopes.
+    /// </summary>
+    public IEnumerable<Blackboard> GetAllBlackboards()
+    {
+        var seen = new HashSet<Blackboard>();
+        foreach (var op in _operations)
+        {
+            if (op is BlackboardPushOp bbOp && seen.Add(bbOp.Blackboard))
+                yield return bbOp.Blackboard;
+        }
+    }
+
+    /// <summary>
     /// Get the current node builder from the nearest composite or decorator frame.
     /// </summary>
     private NodeBuilder? GetCurrentNodeBuilder()
@@ -398,6 +412,9 @@ public class TreeBuilder<TBuilder>
         {
             // 一步回滚到检查点：撤销占位与临时 End，恢复全部状态
             ResetTo(checkpoint);
+            // 清空黑板：Preview 不留授权/值痕迹
+            foreach (var bb in GetAllBlackboards())
+                bb.Clear();
         }
     }
 }

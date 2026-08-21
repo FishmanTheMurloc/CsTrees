@@ -68,14 +68,16 @@ namespace CsTrees.MEAI
             }
 
             string? blackboard = null;
-            var bb = builder.GetCurrentBlackboard();
-            if (bb is not null)
+            var allItems = new List<BlackboardItem>();
+            foreach (var bb in builder.GetAllBlackboards())
             {
                 var items = bb.GetItems();
                 if (items.Any())
-                {
-                    blackboard = TreeDisplay.AsciiBlackboard(items);
-                }
+                    allItems.AddRange(items);
+            }
+            if (allItems.Count > 0)
+            {
+                blackboard = TreeDisplay.AsciiBlackboard(allItems);
             }
 
             return new ToolResult { Message = message, Tree = tree, Blackboard = blackboard };
@@ -170,7 +172,8 @@ namespace CsTrees.MEAI
         [Description("重置行为树构建器，清除所有已添加的节点和状态，从头开始。")]
         public ToolResult ResetTree()
         {
-            builder.GetCurrentBlackboard()?.Clear();
+            foreach (var bb in builder.GetAllBlackboards())
+                bb.Clear();
             builder.ResetTo(_checkpoint);
             builtTree = null;
             return new ToolResult { Message = "构建器已重置，可以从头开始构建行为树。" };
