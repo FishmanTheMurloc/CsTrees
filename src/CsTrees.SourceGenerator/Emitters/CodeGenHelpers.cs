@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using CsTrees.SourceGenerator.Models;
 using Microsoft.CodeAnalysis;
@@ -34,6 +35,19 @@ internal static class CodeGenHelpers
             if (isNullable)
                 return "null";
             return null;
+        }
+
+        // 枚举默认值：通过枚举符号解析回成员名，输出全限定形式
+        if (paramType is INamedTypeSymbol enumType && enumType.TypeKind == TypeKind.Enum)
+        {
+            var memberName = enumType.GetMembers()
+                .OfType<IFieldSymbol>()
+                .Where(f => f.HasConstantValue)
+                .FirstOrDefault(f => Equals(f.ConstantValue, value))?.Name;
+            if (memberName is not null)
+                return $"{enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{memberName}";
+            // 找不到对应成员（默认值为未定义的底层数值）时回退为强转形式
+            return $"({enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)})({value})";
         }
 
         return value switch
